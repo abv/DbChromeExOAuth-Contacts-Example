@@ -1,0 +1,1 @@
+Modification of Google's sample OAuth Contacts Chrome Extension to store tokens and secrets in a Web SQL Database (asynchronous) instead of using localStorage (synchronous).
