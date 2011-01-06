@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<!--
+ * Copyright (c) 2009 The Chromium Authors. All rights reserved.  Use of this
+ * source code is governed by a BSD-style license that can be found in the
+ * LICENSE file.
+-->
+<html>
+  <head>
+	<script src="vendor/persistence/lib/persistence.js" type="application/javascript"></script>
+	<script src="vendor/persistence/lib/persistence.store.sql.js" type="application/javascript"></script>
+	<script src="vendor/persistence/lib/persistence.store.websql.js" type="application/javascript"></script>
+    <script type="text/javascript" src="chrome_ex_oauthsimple.js"></script>
+    <script type="text/javascript" src="chrome_ex_oauth.js"></script>
+    <script type="text/javascript" src="db_chrome_ex_oauth.js"></script>
+    <script type="text/javascript">
+      persistence.store.websql.config(persistence, 'yourdbname', 'A database description', 5 * 1024 * 1024);
+      var MyTable = persistence.define('myTable', {
+        data: "JSON"
+      });
+    
+    var dbData;
+    var oauth = {};
+    var oauth_dance = {};
+    var contacts = null;
+
+	persistence.schemaSync(function() {
+	  MyTable.all().count(function(c){
+		if (c == 0) {
+		  dbData = new MyTable({ data : {} });
+		  persistence.add(dbData);
+		  persistence.flush(function(){
+		    ready();	
+		  });
+		} else {
+	      ready();
+		}
+	  });
+	});
+	
+	
+      function ready(c){
+		  MyTable.all().list(null, function(results){
+			console.log(results);
+			dbData = results[0];
+			  results.forEach(function (r) {
+				console.log(r);
+				oauth_dance[r.id] = {};
+				oauth[r.id] = {};
+		      });
+		  	oauth[dbData.id] = DbChromeExOAuth.initBackgroundPage({
+		        'request_url' : 'https://www.google.com/accounts/OAuthGetRequestToken',
+		        'authorize_url' : 'https://www.google.com/accounts/OAuthAuthorizeToken',
+		        'access_url' : 'https://www.google.com/accounts/OAuthGetAccessToken',
+		        'consumer_key' : 'anonymous',
+		        'consumer_secret' : 'anonymous',
+		        'scope' : 'http://www.google.com/m8/feeds/',
+		        'app_name' : 'Sample - OAuth Contacts',
+		        'token_id' : dbData.id
+		      });
+		    setIcon();
+	      });
+	  }
+      
+
+      function setIcon() {
+        oauth[dbData.id].hasToken(function(){
+	      chrome.browserAction.setIcon({ 'path' : 'img/icon-19-on.png'});
+        }, function(){
+          chrome.browserAction.setIcon({ 'path' : 'img/icon-19-off.png'});
+        });
+      };
+
+      function onContacts(text, xhr) {
+        contacts = [];
+        var data = JSON.parse(text);
+        for (var i = 0, entry; entry = data.feed.entry[i]; i++) {
+          var contact = {
+            'name' : entry['title']['$t'],
+            'id' : entry['id']['$t'],
+            'emails' : []
+          };
+
+          if (entry['gd$email']) {
+            var emails = entry['gd$email'];
+            for (var j = 0, email; email = emails[j]; j++) {
+              contact['emails'].push(email['address']);
+            }
+          }
+
+          if (!contact['name']) {
+            contact['name'] = contact['emails'][0] || "<Unknown>";
+          }
+          contacts.push(contact);
+        }
+
+        chrome.tabs.create({ 'url' : 'contacts.html'});
+      };
+
+      function getContacts() {
+        oauth[dbData.id].authorize(function() {
+          console.log("on authorize");
+          setIcon();
+          var url = "http://www.google.com/m8/feeds/contacts/default/full";
+          oauth[dbData.id].sendSignedRequest(url, onContacts, {
+            'parameters' : {
+              'alt' : 'json',
+              'max-results' : 100
+            }
+          });
+        });
+      };
+
+      function logout() {
+        oauth[dbData.id].clearTokens(function(){
+          setIcon();
+        });
+      };
+
+      chrome.browserAction.onClicked.addListener(getContacts);
+
+    </script>
+  </head>
+  <body>
+  </body>
+</html>

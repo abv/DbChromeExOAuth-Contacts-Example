@@ -1,0 +1,3 @@
+[submodule "vendor/persistence"]
+	path = vendor/persistence
+	url = https://github.com/zefhemel/persistencejs.git
