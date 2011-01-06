@@ -238,6 +238,7 @@ DbChromeExOAuth.prototype.onRequestToken = function(callback, xhr) {
 };
 
 DbChromeExOAuth.prototype.onAccessToken = function(callback, xhr) {
+  var scope = this;
   if (xhr.readyState == 4) {
     var bg = chrome.extension.getBackgroundPage();
     if (xhr.status == 200) {
@@ -245,11 +246,11 @@ DbChromeExOAuth.prototype.onAccessToken = function(callback, xhr) {
       var token = params["oauth_token"];
       var secret = params["oauth_token_secret"];
       this.setTokenAndSecret(token, secret, function(){
-        bg.chromeExOAuthRequestingAccess = false;
+        bg.oauth_dance[scope.token_id].chromeExOAuthRequestingAccess = false;
         callback(token, secret);
       });
     } else {
-      bg.chromeExOAuthRequestingAccess = false;
+      bg.oauth_dance[scope.token_id].chromeExOAuthRequestingAccess = false;
       throw new Error("Fetching access token failed with status " + xhr.status);
     }
   }
@@ -313,6 +314,7 @@ DbChromeExOAuth.fromConfig = function(oauth_config) {
 };
 
 DbChromeExOAuth.initCallbackPage = function() {
+  console.log(chrome.extension);
   var params = DbChromeExOAuth.getQueryStringParams();
   var background_page = chrome.extension.getBackgroundPage();
   var oauth_dance = background_page.oauth_dance[params.automato_token_id];
